@@ -1,19 +1,26 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BoardState } from '@murder-board/shared';
+import type { BoardState, Case } from '@murder-board/shared';
 
 // Mock the API module so tests never hit the network or real localStorage
 vi.mock('../api', () => {
-  const state: BoardState = {
+  const board: BoardState = {
     cards: [
       { id: '1', type: 'suspect',  title: 'John Doe',      description: 'Test suspect', x: 80,  y: 130 },
       { id: '2', type: 'clue',     title: 'Bloody Knife',  description: 'Test clue',    x: 380, y: 180 },
     ],
     connections: [{ id: 'c1', from: '1', to: '2' }],
   };
+  const caseItem = { id: '1', name: 'Test Case', description: '', createdAt: '', updatedAt: '', board };
   return {
-    fetchBoard: vi.fn().mockResolvedValue(state),
+    fetchCases: vi.fn().mockResolvedValue([{ id: '1', name: 'Test Case', description: '', createdAt: '', updatedAt: '' }]),
+    fetchCase:  vi.fn().mockResolvedValue(caseItem),
+    createCase: vi.fn().mockResolvedValue(caseItem),
+    updateCase: vi.fn().mockResolvedValue(caseItem),
+    deleteCase: vi.fn().mockResolvedValue(undefined),
+    // legacy
+    fetchBoard: vi.fn().mockResolvedValue(board),
     saveBoard:  vi.fn().mockResolvedValue(undefined),
   };
 });

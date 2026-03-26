@@ -1,46 +1,51 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import type { BoardCard, BoardState, Connection, CardType } from '@murder-board/shared';
-import { fetchBoard, saveBoard } from '../api';
+import type { BoardCard, BoardState, Connection, CardType, Case, CaseListItem } from '@murder-board/shared';
+import { fetchCases, fetchCase, createCase, updateCase, deleteCase } from '../api';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 const DEBOUNCE_MS = 1200;
 
 export function useBoard() {
-  const [state, setState]           = useState<BoardState>({ cards: [], connections: [] });
-  const [loading, setLoading]       = useState(true);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [caseList,      setCaseList]      = useState<CaseListItem[]>([]);
+  const [activeCase,    setActiveCase]    = useState<Case | null>(null);
+  const [state,         setState]         = useState<BoardState>({ cards: [], connections: [] });
+  const [loading,       setLoading]       = useState(true);
+  const [saveStatus,    setSaveStatus]    = useState<SaveStatus>('idle');
 
-  // Tracks the last state object that was fetched from / persisted to the server.
-  // When state === serverRef.current, nothing has changed and we skip saving.
   const serverRef = useRef<BoardState | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load initial state from API (or localStorage fallback)
+  // ── Load case list on mount, then open first case ──────────────────────────
   useEffect(() => {
-    fetchBoard()
-      .then(s => {
-        serverRef.current = s;
-        setState(s);
+    fetchCases()
+      .then(async (list) => {
+        setCaseList(list);
+        if (list.length > 0) {
+          const c = await fetchCase(list[0].id);
+          serverRef.current = c.board;
+          setActiveCase(c);
+          setState(c.board);
+        }
       })
       .catch(() => setSaveStatus('error'))
       .finally(() => setLoading(false));
   }, []);
 
-  // Debounced save whenever state changes after the initial load
+  // ── Debounced save whenever board state changes ─────────────────────────────
   useEffect(() => {
-    if (state === serverRef.current) return; // nothing changed since last sync
-    if (loading) return;
+    if (state === serverRef.current) return;
+    if (loading || !activeCase) return;
 
     setSaveStatus('saving');
     if (saveTimer.current) clearTimeout(saveTimer.current);
 
     saveTimer.current = setTimeout(() => {
-      serverRef.current = state; // optimistic
-      saveBoard(state)
+      serverRef.current = state;
+      updateCase(activeCase.id, { board: state })
         .then(() => setSaveStatus('saved'))
         .catch(() => {
-          serverRef.current = null; // force retry on next change
+          serverRef.current = null;
           setSaveStatus('error');
         });
     }, DEBOUNCE_MS);
@@ -48,7 +53,51 @@ export function useBoard() {
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [state, loading]);
+  }, [state, loading, activeCase]);
+
+  // ── Case management ─────────────────────────────────────────────────────────
+
+  const selectCase = useCallback(async (id: string) => {
+    setLoading(true);
+    try {
+      const c = await fetchCase(id);
+      serverRef.current = c.board;
+      setActiveCase(c);
+      setState(c.board);
+    } catch {
+      setSaveStatus('error');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const addNewCase = useCallback(async (name: string, description: string) => {
+    const c = await createCase(name, description);
+    setCaseList(prev => [...prev, { id: c.id, name: c.name, description: c.description, createdAt: c.createdAt, updatedAt: c.updatedAt }]);
+    serverRef.current = c.board;
+    setActiveCase(c);
+    setState(c.board);
+    return c;
+  }, []);
+
+  const removeCase = useCallback(async (id: string) => {
+    await deleteCase(id);
+    const nextList = caseList.filter(c => c.id !== id);
+    setCaseList(nextList);
+    if (activeCase?.id === id) {
+      if (nextList.length > 0) {
+        const c = await fetchCase(nextList[0].id);
+        serverRef.current = c.board;
+        setActiveCase(c);
+        setState(c.board);
+      } else {
+        setActiveCase(null);
+        setState({ cards: [], connections: [] });
+      }
+    }
+  }, [caseList, activeCase]);
+
+  // ── Board mutation helpers ──────────────────────────────────────────────────
 
   const addCard = useCallback((type: CardType, title: string, description: string) => {
     const card: BoardCard = {
@@ -89,10 +138,6 @@ export function useBoard() {
     });
   }, []);
 
-  const clearBoard = useCallback(() => {
-    setState({ cards: [], connections: [] });
-  }, []);
-
   const deleteConnection = useCallback((id: string) => {
     setState(s => ({
       ...s,
@@ -100,11 +145,23 @@ export function useBoard() {
     }));
   }, []);
 
+  const clearBoard = useCallback(() => {
+    setState({ cards: [], connections: [] });
+  }, []);
+
   return {
+    // case management
+    caseList,
+    activeCase,
+    selectCase,
+    addNewCase,
+    removeCase,
+    // board state
     cards: state.cards,
     connections: state.connections,
     loading,
     saveStatus,
+    // board mutations
     addCard,
     deleteCard,
     updateCardPosition,

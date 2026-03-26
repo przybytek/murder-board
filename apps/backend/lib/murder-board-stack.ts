@@ -1,5 +1,6 @@
 import * as path from 'path';
 import * as cdk from 'aws-cdk-lib';
+import * as cr from 'aws-cdk-lib/custom-resources';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaNodeJs from 'aws-cdk-lib/aws-lambda-nodejs';
@@ -61,21 +62,63 @@ export class MurderBoardStack extends cdk.Stack {
 
     table.grantReadWriteData(boardFn);
 
-    // ── API Gateway ─────────────────────────────────────────────────────────
-    const api = new apigw.RestApi(this, 'BoardApi', {
-      restApiName: 'murder-board-api',
-      deployOptions: { stageName: 'prod' },
-      defaultCorsPreflightOptions: {
-        allowOrigins: [`https://${DOMAIN}`, `https://www.${DOMAIN}`],
-        allowMethods: ['GET', 'PUT', 'OPTIONS'],
-        allowHeaders: ['Content-Type'],
+    // ── Seed Lambda (runs once on first deploy) ─────────────────────────────
+    const seedFn = new lambdaNodeJs.NodejsFunction(this, 'SeedFunction', {
+      entry: path.join(__dirname, '../lambda/seed-handler.ts'),
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_20_X,
+      architecture: lambda.Architecture.ARM_64,
+      memorySize: 256,
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        TABLE_NAME: table.tableName,
+      },
+      bundling: {
+        externalModules: ['@aws-sdk/*'],
       },
     });
 
-    const boardResource = api.root.addResource('board');
-    const integration   = new apigw.LambdaIntegration(boardFn);
-    boardResource.addMethod('GET', integration);
-    boardResource.addMethod('PUT', integration);
+    table.grantReadWriteData(seedFn);
+
+    // Invoke the seed Lambda once at deploy time via a CDK custom resource.
+    // The seed handler is idempotent — it checks for SEEDED_FLAG before writing.
+    const seedProvider = new cr.Provider(this, 'SeedProvider', {
+      onEventHandler: seedFn,
+    });
+    new cdk.CustomResource(this, 'SeedResource', {
+      serviceToken: seedProvider.serviceToken,
+    });
+
+    // ── API Gateway ─────────────────────────────────────────────────────────
+    const allowedOrigins = [
+      `https://${DOMAIN}`,
+      `https://www.${DOMAIN}`,
+      `https://${SITE_SUBDOMAIN}`,
+    ];
+    const corsOptions: apigw.CorsOptions = {
+      allowOrigins: allowedOrigins,
+      allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowHeaders: ['Content-Type'],
+    };
+
+    const api = new apigw.RestApi(this, 'BoardApi', {
+      restApiName: 'murder-board-api',
+      deployOptions: { stageName: 'prod' },
+      defaultCorsPreflightOptions: corsOptions,
+    });
+
+    const integration = new apigw.LambdaIntegration(boardFn);
+
+    // /cases
+    const casesResource = api.root.addResource('cases');
+    casesResource.addMethod('GET',  integration);
+    casesResource.addMethod('POST', integration);
+
+    // /cases/{id}
+    const caseResource = casesResource.addResource('{id}');
+    caseResource.addMethod('GET',    integration);
+    caseResource.addMethod('PUT',    integration);
+    caseResource.addMethod('DELETE', integration);
 
     // Custom domain for the API  →  api.przybytek.com/murder-board
     const apiDomain = new apigw.DomainName(this, 'ApiDomain', {

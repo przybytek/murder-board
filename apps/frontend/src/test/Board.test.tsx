@@ -1,18 +1,25 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { BoardState } from '@murder-board/shared';
+import type { BoardState, Case } from '@murder-board/shared';
 
 vi.mock('../api', () => {
-  const state: BoardState = {
+  const board: BoardState = {
     cards: [
       { id: '1', type: 'suspect', title: 'Alice', description: 'Suspect one', x: 80,  y: 130 },
       { id: '2', type: 'clue',    title: 'Knife',  description: 'A weapon',   x: 300, y: 200 },
     ],
     connections: [],
   };
+  const caseItem = { id: '1', name: 'Test Case', description: '', createdAt: '', updatedAt: '', board };
   return {
-    fetchBoard: vi.fn().mockResolvedValue(state),
+    fetchCases: vi.fn().mockResolvedValue([{ id: '1', name: 'Test Case', description: '', createdAt: '', updatedAt: '' }]),
+    fetchCase:  vi.fn().mockResolvedValue(caseItem),
+    createCase: vi.fn().mockResolvedValue(caseItem),
+    updateCase: vi.fn().mockResolvedValue(caseItem),
+    deleteCase: vi.fn().mockResolvedValue(undefined),
+    // legacy
+    fetchBoard: vi.fn().mockResolvedValue(board),
     saveBoard:  vi.fn().mockResolvedValue(undefined),
   };
 });
@@ -116,5 +123,26 @@ describe('Board', () => {
     await waitFor(() =>
       expect(document.querySelectorAll('.card').length).toBe(0)
     );
+  });
+
+  it('renders the case selector dropdown', async () => {
+    await renderBoard();
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
+    expect(screen.getByText('Test Case')).toBeInTheDocument();
+  });
+
+  it('switching case via dropdown calls fetchCase', async () => {
+    const { fetchCase } = await import('../api');
+    await renderBoard();
+    // Simulate selecting a different case id
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } });
+    await waitFor(() => expect(fetchCase).toHaveBeenCalled());
+  });
+
+  it('shows + New Case button and opens form', async () => {
+    await renderBoard();
+    expect(screen.getByText('+ New Case')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('+ New Case'));
+    expect(screen.getByPlaceholderText('Case name')).toBeInTheDocument();
   });
 });

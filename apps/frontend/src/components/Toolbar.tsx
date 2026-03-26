@@ -1,12 +1,19 @@
 import React from 'react';
 import type { SaveStatus } from '../hooks/useBoard';
+import type { CaseListItem } from '@murder-board/shared';
+import { CaseSelector } from './CaseSelector';
 
 interface ToolbarProps {
   connectMode: boolean;
   saveStatus: SaveStatus;
+  cases: CaseListItem[];
+  activeCaseId: string | undefined;
   onAddCard: () => void;
   onToggleConnect: () => void;
   onClearBoard: () => void;
+  onSelectCase: (id: string) => void;
+  onAddCase: (name: string, description: string) => void;
+  onDeleteCase: (id: string) => void;
 }
 
 const SAVE_LABEL: Record<SaveStatus, string> = {
@@ -19,12 +26,25 @@ const SAVE_LABEL: Record<SaveStatus, string> = {
 export const Toolbar: React.FC<ToolbarProps> = ({
   connectMode,
   saveStatus,
+  cases,
+  activeCaseId,
   onAddCard,
   onToggleConnect,
   onClearBoard,
+  onSelectCase,
+  onAddCase,
+  onDeleteCase,
 }) => (
   <div className="toolbar">
     <span className="toolbar__title">Murder Board</span>
+
+    <CaseSelector
+      cases={cases}
+      activeCaseId={activeCaseId}
+      onSelect={onSelectCase}
+      onAdd={onAddCase}
+      onDelete={onDeleteCase}
+    />
 
     <button className="toolbar__btn toolbar__btn--add" onClick={onAddCard}>
       + Add Card
@@ -53,3 +73,4 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     )}
   </div>
 );
+

@@ -19,3 +19,20 @@ export interface BoardState {
   cards: BoardCard[];
   connections: Connection[];
 }
+
+export interface Case {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  board: BoardState;
+}
+
+export interface CaseListItem {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}

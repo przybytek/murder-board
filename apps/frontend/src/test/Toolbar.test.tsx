@@ -15,10 +15,24 @@ describe('Toolbar', () => {
     onClearBoard.mockClear();
   });
 
+  const onSelectCase = vi.fn();
+  const onAddCase    = vi.fn();
+  const onDeleteCase = vi.fn();
+
   const render$ = (connectMode = false, saveStatus: SaveStatus = 'idle') =>
     render(
-      <Toolbar connectMode={connectMode} saveStatus={saveStatus}
-        onAddCard={onAddCard} onToggleConnect={onToggleConnect} onClearBoard={onClearBoard} />
+      <Toolbar
+        connectMode={connectMode}
+        saveStatus={saveStatus}
+        cases={[]}
+        activeCaseId={undefined}
+        onAddCard={onAddCard}
+        onToggleConnect={onToggleConnect}
+        onClearBoard={onClearBoard}
+        onSelectCase={onSelectCase}
+        onAddCase={onAddCase}
+        onDeleteCase={onDeleteCase}
+      />
     );
 
   it('renders all buttons', () => {

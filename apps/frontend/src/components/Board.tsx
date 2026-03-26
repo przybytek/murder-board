@@ -11,8 +11,11 @@ const CARD_H = 110;
 
 const Board: React.FC = () => {
   const boardRef = useRef<HTMLDivElement>(null);
-  const { cards, connections, loading, saveStatus, addCard, deleteCard, updateCardPosition, addConnection, deleteConnection, clearBoard } =
-    useBoard();
+  const {
+    cards, connections, loading, saveStatus,
+    caseList, activeCase, selectCase, addNewCase, removeCase,
+    addCard, deleteCard, updateCardPosition, addConnection, deleteConnection, clearBoard,
+  } = useBoard();
 
   const [dragging, setDragging] = useState<{ id: string; offsetX: number; offsetY: number } | null>(
     null
@@ -181,9 +184,14 @@ const Board: React.FC = () => {
       <Toolbar
         connectMode={connectMode}
         saveStatus={saveStatus}
+        cases={caseList}
+        activeCaseId={activeCase?.id}
         onAddCard={() => setShowModal(true)}
         onToggleConnect={handleToggleConnect}
         onClearBoard={clearBoard}
+        onSelectCase={selectCase}
+        onAddCase={addNewCase}
+        onDeleteCase={removeCase}
       />
 
       {/* Connect-mode hint */}
