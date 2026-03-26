@@ -46,6 +46,41 @@ html, body, #root {
   stroke-linecap: round;
   opacity: 0.85;
   filter: drop-shadow(0 1px 3px rgba(200, 0, 0, 0.5));
+  pointer-events: none;
+}
+
+.connection-line--hovered {
+  stroke: #ff4444;
+  opacity: 1;
+  filter: drop-shadow(0 1px 6px rgba(255, 60, 60, 0.8));
+}
+
+/* ─── Connection delete button ───────────────────────────── */
+.connection-delete {
+  cursor: pointer;
+  pointer-events: all;
+}
+
+.connection-delete circle {
+  fill: #1a0808;
+  stroke: #cc1111;
+  stroke-width: 1.5;
+  filter: drop-shadow(0 1px 4px rgba(0,0,0,0.8));
+}
+
+.connection-delete:hover circle {
+  fill: #cc1111;
+}
+
+.connection-delete text {
+  fill: #ff8888;
+  font-size: 13px;
+  font-weight: bold;
+  user-select: none;
+}
+
+.connection-delete:hover text {
+  fill: #fff;
 }
 
 /* ─── Toolbar ───────────────────────────────────────────── */

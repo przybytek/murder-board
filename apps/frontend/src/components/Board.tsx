@@ -11,7 +11,7 @@ const CARD_H = 110;
 
 const Board: React.FC = () => {
   const boardRef = useRef<HTMLDivElement>(null);
-  const { cards, connections, loading, saveStatus, addCard, deleteCard, updateCardPosition, addConnection, clearBoard } =
+  const { cards, connections, loading, saveStatus, addCard, deleteCard, updateCardPosition, addConnection, deleteConnection, clearBoard } =
     useBoard();
 
   const [dragging, setDragging] = useState<{ id: string; offsetX: number; offsetY: number } | null>(
@@ -22,6 +22,7 @@ const Board: React.FC = () => {
   const [connectMode, setConnectMode]   = useState(false);
   const [connectFrom, setConnectFrom]   = useState<string | null>(null);
   const [showModal, setShowModal]       = useState(false);
+  const [hoveredConn, setHoveredConn]   = useState<string | null>(null);
 
   // Attach window-level mousemove/mouseup so drags work even outside the board
   useEffect(() => {
@@ -126,13 +127,38 @@ const Board: React.FC = () => {
           const from = centre(conn.from);
           const to   = centre(conn.to);
           if (!from || !to) return null;
+          const mx = (from.x + to.x) / 2;
+          const my = (from.y + to.y) / 2;
+          const isHovered = hoveredConn === conn.id;
           return (
-            <line
+            <g
               key={conn.id}
-              className="connection-line"
-              x1={from.x} y1={from.y}
-              x2={to.x}   y2={to.y}
-            />
+              onMouseEnter={() => setHoveredConn(conn.id)}
+              onMouseLeave={() => setHoveredConn(null)}
+            >
+              {/* Wider invisible hit area so hover is easy to trigger */}
+              <line
+                x1={from.x} y1={from.y}
+                x2={to.x}   y2={to.y}
+                stroke="transparent"
+                strokeWidth={20}
+              />
+              <line
+                className={`connection-line${isHovered ? ' connection-line--hovered' : ''}`}
+                x1={from.x} y1={from.y}
+                x2={to.x}   y2={to.y}
+              />
+              {isHovered && (
+                <g
+                  className="connection-delete"
+                  transform={`translate(${mx}, ${my})`}
+                  onClick={() => deleteConnection(conn.id)}
+                >
+                  <circle r={10} />
+                  <text textAnchor="middle" dominantBaseline="central">×</text>
+                </g>
+              )}
+            </g>
           );
         })}
       </svg>

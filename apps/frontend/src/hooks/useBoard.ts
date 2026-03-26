@@ -93,6 +93,13 @@ export function useBoard() {
     setState({ cards: [], connections: [] });
   }, []);
 
+  const deleteConnection = useCallback((id: string) => {
+    setState(s => ({
+      ...s,
+      connections: s.connections.filter(conn => conn.id !== id),
+    }));
+  }, []);
+
   return {
     cards: state.cards,
     connections: state.connections,
@@ -102,6 +109,7 @@ export function useBoard() {
     deleteCard,
     updateCardPosition,
     addConnection,
+    deleteConnection,
     clearBoard,
   };
 }
