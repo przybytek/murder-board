@@ -9,8 +9,15 @@ import type { CardType } from '@murder-board/shared';
 const CARD_W = 188;
 const CARD_H = 110;
 
-// Minimum Y so cards never slide under the toolbar (toolbar top:16px + ~70px height + 8px gap)
-const TOOLBAR_CLEARANCE = 94;
+// Dead-zone: pointer must move this many px before a tap becomes a drag
+const DRAG_THRESHOLD = 6;
+
+// Returns the toolbar's bottom edge in canvas Y coordinates
+const getToolbarClearance = (board: HTMLElement) => {
+  const toolbar = board.querySelector<HTMLElement>('.toolbar');
+  if (toolbar) return toolbar.getBoundingClientRect().bottom - board.getBoundingClientRect().top + board.scrollTop + 8;
+  return 100 + board.scrollTop;
+};
 
 const Board: React.FC = () => {
   const boardRef = useRef<HTMLDivElement>(null);
@@ -20,42 +27,49 @@ const Board: React.FC = () => {
     addCard, deleteCard, updateCardPosition, addConnection, deleteConnection, clearBoard,
   } = useBoard();
 
-  const [dragging, setDragging] = useState<{ id: string; offsetX: number; offsetY: number } | null>(
-    null
-  );
-  const dragMovedRef = useRef(false);
+  const [dragging, setDragging] = useState<{ id: string; offsetX: number; offsetY: number } | null>(null);
+  const dragMovedRef  = useRef(false);
+  const dragStartRef  = useRef<{ x: number; y: number } | null>(null);
 
-  const [connectMode, setConnectMode]   = useState(false);
-  const [connectFrom, setConnectFrom]   = useState<string | null>(null);
-  const [showModal, setShowModal]       = useState(false);
-  const [hoveredConn, setHoveredConn]   = useState<string | null>(null);
+  const [connectMode, setConnectMode] = useState(false);
+  const [connectFrom, setConnectFrom] = useState<string | null>(null);
+  const [showModal, setShowModal]     = useState(false);
+  const [hoveredConn, setHoveredConn] = useState<string | null>(null);
+  const [selectedConn, setSelectedConn] = useState<string | null>(null);
 
-  // Attach window-level mousemove/mouseup so drags work even outside the board
+  // Pointer-based drag — works for mouse, touch, and stylus
   useEffect(() => {
     if (!dragging) return;
 
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
       const board = boardRef.current;
       if (!board) return;
+      // Apply dead-zone threshold before treating movement as a drag
+      if (dragStartRef.current) {
+        const dx = e.clientX - dragStartRef.current.x;
+        const dy = e.clientY - dragStartRef.current.y;
+        if (Math.hypot(dx, dy) > DRAG_THRESHOLD) dragMovedRef.current = true;
+      }
+      if (!dragMovedRef.current) return;
       const rect = board.getBoundingClientRect();
-      const x = Math.max(0, e.clientX - rect.left - dragging.offsetX);
-      const y = Math.max(TOOLBAR_CLEARANCE, e.clientY - rect.top - dragging.offsetY);
-      dragMovedRef.current = true;
+      const minY = getToolbarClearance(board);
+      const x = Math.max(0, e.clientX - rect.left + board.scrollLeft - dragging.offsetX);
+      const y = Math.max(minY,  e.clientY - rect.top  + board.scrollTop  - dragging.offsetY);
       updateCardPosition(dragging.id, x, y);
     };
 
-    const onUp = () => setDragging(null);
+    const onUp = () => { setDragging(null); dragStartRef.current = null; };
 
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup',   onUp);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup',   onUp);
     return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup',   onUp);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup',   onUp);
     };
   }, [dragging, updateCardPosition]);
 
-  const handleCardMouseDown = useCallback(
-    (e: React.MouseEvent, id: string) => {
+  const handleCardPointerDown = useCallback(
+    (e: React.PointerEvent, id: string) => {
       if (connectMode) return;
       e.preventDefault();
       e.stopPropagation();
@@ -65,10 +79,12 @@ const Board: React.FC = () => {
       if (!card) return;
       const rect = board.getBoundingClientRect();
       dragMovedRef.current = false;
+      dragStartRef.current = { x: e.clientX, y: e.clientY };
+      setSelectedConn(null);
       setDragging({
         id,
-        offsetX: e.clientX - rect.left - card.x,
-        offsetY: e.clientY - rect.top  - card.y,
+        offsetX: e.clientX - rect.left + board.scrollLeft - card.x,
+        offsetY: e.clientY - rect.top  + board.scrollTop  - card.y,
       });
     },
     [connectMode, cards]
@@ -127,63 +143,68 @@ const Board: React.FC = () => {
 
   return (
     <div ref={boardRef} className={boardClass}>
-      {/* Red yarn connections */}
-      <svg className="board__connections">
-        {connections.map(conn => {
-          const from = centre(conn.from);
-          const to   = centre(conn.to);
-          if (!from || !to) return null;
-          const mx = (from.x + to.x) / 2;
-          const my = (from.y + to.y) / 2;
-          const isHovered = hoveredConn === conn.id;
-          return (
-            <g
-              key={conn.id}
-              onMouseEnter={() => setHoveredConn(conn.id)}
-              onMouseLeave={() => setHoveredConn(null)}
-            >
-              {/* Wider invisible hit area so hover is easy to trigger */}
-              <line
-                x1={from.x} y1={from.y}
-                x2={to.x}   y2={to.y}
-                stroke="transparent"
-                strokeWidth={20}
-              />
-              <line
-                className={`connection-line${isHovered ? ' connection-line--hovered' : ''}`}
-                x1={from.x} y1={from.y}
-                x2={to.x}   y2={to.y}
-              />
-              {isHovered && (
-                <g
-                  className="connection-delete"
-                  transform={`translate(${mx}, ${my})`}
-                  onClick={() => deleteConnection(conn.id)}
-                >
-                  <circle r={10} />
-                  <text textAnchor="middle" dominantBaseline="central">×</text>
-                </g>
-              )}
-            </g>
-          );
-        })}
-      </svg>
+      {/* Scrollable canvas — cards and connections live here */}
+      <div className="board__canvas" onClick={() => setSelectedConn(null)}>
+        <svg className="board__connections">
+          {connections.map(conn => {
+            const from = centre(conn.from);
+            const to   = centre(conn.to);
+            if (!from || !to) return null;
+            const mx = (from.x + to.x) / 2;
+            const my = (from.y + to.y) / 2;
+            const isActive = hoveredConn === conn.id || selectedConn === conn.id;
+            return (
+              <g
+                key={conn.id}
+                style={{ pointerEvents: 'all' }}
+                onClick={(e) => { e.stopPropagation(); setSelectedConn(prev => prev === conn.id ? null : conn.id); }}
+                onMouseEnter={() => setHoveredConn(conn.id)}
+                onMouseLeave={() => setHoveredConn(null)}
+              >
+                {/* Wide invisible hit/touch area */}
+                <line
+                  x1={from.x} y1={from.y}
+                  x2={to.x}   y2={to.y}
+                  stroke="transparent"
+                  strokeWidth={28}
+                  style={{ pointerEvents: 'stroke' }}
+                />
+                <line
+                  className={`connection-line${isActive ? ' connection-line--hovered' : ''}`}
+                  x1={from.x} y1={from.y}
+                  x2={to.x}   y2={to.y}
+                />
+                {isActive && (
+                  <g
+                    className="connection-delete"
+                    transform={`translate(${mx}, ${my})`}
+                    onClick={(e) => { e.stopPropagation(); deleteConnection(conn.id); setSelectedConn(null); }}
+                  >
+                    <circle r={14} />
+                    <text textAnchor="middle" dominantBaseline="central">×</text>
+                  </g>
+                )}
+              </g>
+            );
+          })}
+        </svg>
 
-      {/* Cards */}
-      {cards.map(card => (
-        <Card
-          key={card.id}
-          card={card}
-          isSelected={connectFrom === card.id}
-          isDragging={dragging?.id === card.id}
-          connectMode={connectMode}
-          onMouseDown={e => handleCardMouseDown(e, card.id)}
-          onClick={() => handleCardClick(card.id)}
-          onDelete={() => deleteCard(card.id)}
-        />
-      ))}
+        {/* Cards */}
+        {cards.map(card => (
+          <Card
+            key={card.id}
+            card={card}
+            isSelected={connectFrom === card.id}
+            isDragging={dragging?.id === card.id}
+            connectMode={connectMode}
+            onPointerDown={e => handleCardPointerDown(e, card.id)}
+            onClick={() => handleCardClick(card.id)}
+            onDelete={() => deleteCard(card.id)}
+          />
+        ))}
+      </div>
 
-      {/* Toolbar */}
+      {/* Toolbar — fixed to viewport, outside scrollable canvas */}
       <Toolbar
         connectMode={connectMode}
         saveStatus={saveStatus}
@@ -201,8 +222,8 @@ const Board: React.FC = () => {
       {connectMode && (
         <div className="connect-hint">
           {connectFrom
-            ? '🔴 Now click the second card to connect'
-            : '🧵 Click the first card to start a connection'}
+            ? '🔴 Tap the second card to connect'
+            : '🧵 Tap the first card to start a connection'}
         </div>
       )}
 

@@ -22,9 +22,21 @@ html, body, #root {
     radial-gradient(ellipse at 30% 20%, rgba(100, 30, 10, 0.35) 0%, transparent 55%),
     radial-gradient(ellipse at 75% 80%, rgba(60, 20, 5, 0.4)  0%, transparent 55%),
     radial-gradient(ellipse at 50% 50%, rgba(40, 15, 5, 0.2)  0%, transparent 70%);
-  overflow: hidden;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
   cursor: default;
   user-select: none;
+}
+
+.board::-webkit-scrollbar { width: 6px; height: 6px; }
+.board::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
+.board::-webkit-scrollbar-thumb { background: rgba(139,26,26,0.5); border-radius: 3px; }
+
+/* Large inner canvas so cards have room to spread out on all screens */
+.board__canvas {
+  position: relative;
+  min-width: max(100%, 1600px);
+  min-height: max(100%, 1400px);
 }
 
 .board--connecting { cursor: crosshair; }
@@ -85,7 +97,7 @@ html, body, #root {
 
 /* ─── Toolbar ───────────────────────────────────────────── */
 .toolbar {
-  position: absolute;
+  position: fixed;
   top: 16px;
   left: 50%;
   transform: translateX(-50%);
@@ -93,13 +105,16 @@ html, body, #root {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(10, 5, 2, 0.88);
+  background: rgba(10, 5, 2, 0.92);
   padding: 10px 18px;
   border-radius: 8px;
   border: 1px solid rgba(255, 200, 100, 0.12);
   backdrop-filter: blur(6px);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
   white-space: nowrap;
+  max-width: calc(100vw - 20px);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .toolbar__title {
@@ -157,7 +172,7 @@ html, body, #root {
 
 /* ─── Connect hint banner ───────────────────────────────── */
 .connect-hint {
-  position: absolute;
+  position: fixed;
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
@@ -170,6 +185,9 @@ html, body, #root {
   pointer-events: none;
   z-index: 100;
   border: 1px solid rgba(204, 17, 17, 0.4);
+  white-space: nowrap;
+  max-width: calc(100vw - 40px);
+  text-align: center;
 }
 
 /* ─── Card ──────────────────────────────────────────────── */
@@ -515,5 +533,70 @@ html, body, #root {
 .case-selector__input:focus {
   outline: none;
   border-color: #8b1a1a;
+}
+
+/* ─── Mobile / responsive ────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Toolbar: anchor to edges, scrollable horizontally */
+  .toolbar {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    transform: none;
+    border-radius: 6px;
+    overflow-x: auto;
+    padding: 8px 12px;
+    gap: 6px;
+    max-width: none;
+  }
+
+  .toolbar__title {
+    font-size: 12px;
+    letter-spacing: 2px;
+    padding-right: 10px;
+  }
+
+  .toolbar__btn {
+    padding: 7px 10px;
+    font-size: 12px;
+    /* min tap target */
+    min-height: 36px;
+  }
+
+  .case-selector__select {
+    max-width: 140px;
+  }
+
+  .case-selector__label {
+    display: none; /* save horizontal space */
+  }
+
+  /* Connect hint: slightly higher on mobile so thumb can rest below it */
+  .connect-hint {
+    bottom: 28px;
+    font-size: 13px;
+    padding: 10px 22px;
+  }
+
+  /* Modal: full-width on small screens */
+  .modal {
+    width: calc(100vw - 32px);
+    padding: 20px;
+  }
+}
+
+/* Ensure tap targets are comfortably large on touch devices */
+@media (pointer: coarse) {
+  .toolbar__btn,
+  .case-selector__btn {
+    min-height: 40px;
+    padding: 8px 12px;
+  }
+
+  .card__delete {
+    min-width: 32px;
+    min-height: 32px;
+    font-size: 18px;
+  }
 }
 

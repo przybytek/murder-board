@@ -6,7 +6,7 @@ interface CardProps {
   isSelected: boolean;
   isDragging: boolean;
   connectMode: boolean;
-  onMouseDown: (e: React.MouseEvent) => void;
+  onPointerDown: (e: React.PointerEvent) => void;
   onClick: () => void;
   onDelete: () => void;
 }
@@ -23,7 +23,7 @@ export const Card: React.FC<CardProps> = ({
   isSelected,
   isDragging,
   connectMode,
-  onMouseDown,
+  onPointerDown,
   onClick,
   onDelete,
 }) => {
@@ -40,8 +40,8 @@ export const Card: React.FC<CardProps> = ({
   return (
     <div
       className={classes}
-      style={{ left: card.x, top: card.y }}
-      onMouseDown={onMouseDown}
+      style={{ left: card.x, top: card.y, touchAction: 'none' }}
+      onPointerDown={onPointerDown}
       onClick={onClick}
     >
       <div className="card__pin" />

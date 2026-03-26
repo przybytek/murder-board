@@ -60,7 +60,7 @@ describe('Board', () => {
   it('shows connect hint when connect mode is active', async () => {
     await renderBoard();
     fireEvent.click(screen.getByText(/Connect/i));
-    expect(screen.getByText(/Click the first card/i)).toBeInTheDocument();
+    expect(screen.getByText(/first card to start/i)).toBeInTheDocument();
   });
 
   it('selecting first card in connect mode updates hint', async () => {
@@ -68,7 +68,7 @@ describe('Board', () => {
     fireEvent.click(screen.getByText(/Connect/i));
     const cards = document.querySelectorAll('.card');
     fireEvent.click(cards[0]);
-    expect(screen.getByText(/Click the second card/i)).toBeInTheDocument();
+    expect(screen.getByText(/second card to connect/i)).toBeInTheDocument();
     expect(cards[0]).toHaveClass('card--selected');
   });
 
