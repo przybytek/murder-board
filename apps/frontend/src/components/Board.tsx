@@ -9,6 +9,9 @@ import type { CardType } from '@murder-board/shared';
 const CARD_W = 188;
 const CARD_H = 110;
 
+// Minimum Y so cards never slide under the toolbar (toolbar top:16px + ~70px height + 8px gap)
+const TOOLBAR_CLEARANCE = 94;
+
 const Board: React.FC = () => {
   const boardRef = useRef<HTMLDivElement>(null);
   const {
@@ -36,7 +39,7 @@ const Board: React.FC = () => {
       if (!board) return;
       const rect = board.getBoundingClientRect();
       const x = Math.max(0, e.clientX - rect.left - dragging.offsetX);
-      const y = Math.max(0, e.clientY - rect.top  - dragging.offsetY);
+      const y = Math.max(TOOLBAR_CLEARANCE, e.clientY - rect.top - dragging.offsetY);
       dragMovedRef.current = true;
       updateCardPosition(dragging.id, x, y);
     };

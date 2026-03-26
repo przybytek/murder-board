@@ -106,7 +106,7 @@ export function useBoard() {
       title,
       description,
       x: Math.random() * 500 + 80,
-      y: Math.random() * 300 + 80,
+      y: Math.random() * 300 + 110,  // 110 keeps new cards below the toolbar
     };
     setState(s => ({ ...s, cards: [...s.cards, card] }));
   }, []);
